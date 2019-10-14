@@ -200,7 +200,7 @@ fin.series <- fin.series %>%
 
 # Event History Framework - Time Until Second Case
 
-```{r, include=F}
+```{r, include=F, eval=F}
 #keep only first case per person ID and date of second case if one exists
 #create dataset of just first date of second case
 event <- fin.series %>% filter(count==2) %>% select(person_id, Case_Mkey, date) %>% distinct(Case_Mkey, .keep_all = T) %>% rename(event_date = date, event_case_mkey = Case_Mkey)
@@ -258,7 +258,7 @@ eha <- eha %>% group_by(person_id) %>%
 
 ## Kaplan-Meier Plots
 
-```{r, echo=F}
+```{r, echo=F, eval=F}
 
 fit <- survfit(Surv(time = enter, time2 = exit, event = event) ~ 1, data = eha)
 
@@ -311,7 +311,7 @@ ggsurvplot_facet(fit2, eha, facet.by = "race_impute",  conf.int = T,
 
 
 ## Cox Proportional hazards Model
-```{r, echo=F}
+```{r, echo=F, eval=F}
 m1 <- coxph(Surv(time = enter, 
                  time2 = exit,
                  event = event)~age+gender_impute+race_impute+age+pubdef+charge_offense+charge_degree+priors+trial_flag+lfo_debt,
@@ -322,11 +322,12 @@ summary(m1)
 # Fixed Effects Framework
 
 
-```{r, eval=F}
+```{r}
 panel <- fin.series %>% 
   mutate(date = as.Date(paste(date, 01, sep="-"), format = "%Y-%m-%d"),
          sentence_date = as.Date(paste(Sentence_Date, 01, sep="-"), format = "%Y-%m-%d"),
-         Case_Filed_Date = as.Date(paste(as.Date(Case_Filed_Date, format = "Y-%m"), 01, sep="-", 
+         Case_Filed_Date = as.Date(paste(as.Date(str_sub(Case_Filed_Date, 1, str_length(Case_Filed_Date)-3), 
+                                                 format = "Y-%m"), 01, sep="-", 
                                          format = "%Y-%m-%d"))) %>%
   filter(date >= "2010-01-01") %>% group_by(person_id) %>%
   complete(date = seq.Date(min(date), max(date), by = "month")) %>%
@@ -349,7 +350,7 @@ panel <- fin.series %>%
 ```
 
 
-```{r, echo=F,eval=F}
+```{r, echo=F}
 fix1 <- pglm(event~gender_impute+race_impute+age+pubdef+charge_offense+charge_degree+priors+trial_flag+lfo_debt, 
              data = fin.series,  family = binomial(link = "logit"), index = "person_id")
 summary(fix1)
