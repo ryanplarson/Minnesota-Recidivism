@@ -35,7 +35,9 @@ library(tidyr)
 library(stringr)
 library(ggplot2)
 library(lubridate)
-library(plm)
+library(pglm)
+library(survival)
+library(survminer)
 
 ```
 
@@ -44,7 +46,7 @@ library(plm)
 ```{r, include=F}
 #processed party file
 party <- read_csv("~/MonSanc/party.csv") %>% 
-  select(person_id, Party_Mkey, Case_Mkey, gender_impute, race_impute, name_full) %>%
+  select(person_id, Party_Mkey, Case_Mkey, gender_impute, race_impute, name_full, birth_date) %>%
   arrange(person_id, Case_Mkey) 
                    
 case <- read_delim("~/MonSanc/Case.txt", delim = "|", na = "NULL",
@@ -64,10 +66,14 @@ sentence <- read_delim("~/MonSanc/Sentence.txt", delim = "|", na = "NULL", trim_
     slice(-dim(.)[1]) %>% select(Case_Mkey, Sentence_Date) %>% distinct(Case_Mkey, .keep_all = T) %>%
     mutate(Sentence_Date = as.character(format(Sentence_Date, "%Y-%m" )))
 
+#pulling in case level covariates
+  #some of these may be able to be time-varying, kept time constant for now
+monsanc <- read_csv("~/MonSanc/monsanc.csv") %>%
+  select(case_mkey, pubdef, charge_offense, charge_degree, priors, birth_year, trial_flag, adj)
 
 #person-case data with sentence date merged
 person.case <- party %>% left_join(case, by = "Case_Mkey") %>% 
-  left_join(sentence, by = "Case_Mkey") 
+  left_join(sentence, by = "Case_Mkey") %>% left_join(monsanc, by = c("Case_Mkey"="case_mkey"))
 ```
 
 # Financial Data
@@ -185,11 +191,16 @@ fin.series <- fin.series %>% left_join(count, by = c("person_id", "Case_Mkey"))
 
 rm(list = ls()[!ls() %in% c("fin.series")])
 
+#adjusting amounts to January 2018
+fin.series <- fin.series %>%
+  mutate(ordered = ordered*adj, 
+         collected = collected*adj)
+         
 ```
 
 # Event History Framework - Time Until Second Case
 
-```{r, include=F}
+```{r, include=F, eval=F}
 #keep only first case per person ID and date of second case if one exists
 #create dataset of just first date of second case
 event <- fin.series %>% filter(count==2) %>% select(person_id, Case_Mkey, date) %>% distinct(Case_Mkey, .keep_all = T) %>% rename(event_date = date, event_case_mkey = Case_Mkey)
@@ -213,7 +224,8 @@ eha <- eha %>% left_join(event, by = "person_id") %>% select(-count)
 eha <- eha %>% 
   mutate(date = as.Date(paste(date, 01, sep="-"), format = "%Y-%m-%d"),
          event_date = as.Date(paste(event_date, 01, sep="-"), format = "%Y-%m-%d"),
-         sentence_date = as.Date(paste(Sentence_Date, 01, sep="-"), format = "%Y-%m-%d")) %>%
+         sentence_date = as.Date(paste(Sentence_Date, 01, sep="-"), format = "%Y-%m-%d"),
+         age = (date-birth_date)/365.25) %>%
   select(-Sentence_Date) %>%
   filter(date >= "2010-01-01") %>%
   mutate(event = if_else(is.na(event_date)==T, 0, 1), #event indicator
@@ -246,9 +258,7 @@ eha <- eha %>% group_by(person_id) %>%
 
 ## Kaplan-Meier Plots
 
-```{r, echo=F}
-library(survminer)
-library(survival)
+```{r, echo=F, eval=F}
 
 fit <- survfit(Surv(time = enter, time2 = exit, event = event) ~ 1, data = eha)
 
@@ -279,35 +289,69 @@ ggsurvplot(fit2,
            legend.labs = c("<$100", ">=$100"))
 
 
-#ggsurvplot_facet(fit2, eha, facet.by = "gender_impute",  conf.int = T, 
- #          xlim = c(0,2000), 
-  #         break.time.by = 500, 
-   #        ggtheme = theme_minimal(), 
-    #       title = "Kaplan-Meier Plot of Recidivism by Gender: Minnesota 2010-2015",
-     #      legend.title = "LFO Debt",
-      #     legend.labs = c("<$100", ">=$100"), 
-       #    short.panel.labs = T)
+ggsurvplot_facet(fit2, eha, facet.by = "gender_impute",  conf.int = T, 
+           xlim = c(0,2000), 
+           break.time.by = 500, 
+           ggtheme = theme_minimal(), 
+           title = "Kaplan-Meier Plot of Recidivism by Gender: Minnesota 2010-2015",
+           legend.title = "LFO Debt",
+           legend.labs = c("<$100", ">=$100"), 
+           short.panel.labs = T)
 
 
-#ggsurvplot_facet(fit2, eha, facet.by = "race_impute",  conf.int = T, 
- #          xlim = c(0,2000), 
-  #         break.time.by = 500, 
-   #        ggtheme = theme_minimal(), 
-    #       title = "Kaplan-Meier Plot of Recidivism by Race: Minnesota 2010-2015",
-     #      legend.title = "LFO Debt",
-      #     legend.labs = c("<$100", ">=$100"),
-       #    short.panel.labs = T)
+ggsurvplot_facet(fit2, eha, facet.by = "race_impute",  conf.int = T, 
+           xlim = c(0,2000), 
+           break.time.by = 500, 
+           ggtheme = theme_minimal(), 
+           title = "Kaplan-Meier Plot of Recidivism by Race: Minnesota 2010-2015",
+           legend.title = "LFO Debt",
+           legend.labs = c("<$100", ">=$100"),
+           short.panel.labs = T)
 ```
 
 
 ## Cox Proportional hazards Model
-```{r, echo=F}
+```{r, echo=F, eval=F}
+m1 <- coxph(Surv(time = enter, 
+                 time2 = exit,
+                 event = event)~age+gender_impute+race_impute+age+pubdef+charge_offense+charge_degree+priors+trial_flag+lfo_debt,
+            data = eha)
+summary(m1)
+```
+
+# Fixed Effects Framework
+
+
+```{r}
+panel <- fin.series %>% 
+  mutate(date = as.Date(paste(date, 01, sep="-"), format = "%Y-%m-%d"),
+         sentence_date = as.Date(paste(Sentence_Date, 01, sep="-"), format = "%Y-%m-%d"),
+         Case_Filed_Date = as.Date(paste(as.Date(str_sub(Case_Filed_Date, 1, str_length(Case_Filed_Date)-3), 
+                                                 format = "Y-%m"), 01, sep="-", 
+                                         format = "%Y-%m-%d"))) %>%
+  filter(date >= "2010-01-01") %>% group_by(person_id) %>%
+  complete(date = seq.Date(min(date), max(date), by = "month")) %>%
+  fill(Case_Mkey, Case_Filed_Date, sentence_date, county, Party_Mkey, gender_impute, race_impute,
+       name_full, birth_date, sentence_date, pubdef, charge_offense, charge_degree,
+       trial_flag, adj, count) %>%
+  mutate(ordered = replace_na(ordered, 0), collected = replace_na(collected, 0),
+         age = (date-birth_date)/365.25) %>% 
+  group_by(person_id) %>% 
+  mutate(event = ifelse(date==Case_Filed_Date, 1, 0)) %>%
+  mutate(cum_order = cumsum(ordered),
+         cum_coll  = cumsum(collected)) %>%
+  ungroup() %>%
+  mutate(lfo_debt = cum_order-cum_coll) %>%
+  filter(lfo_debt >= 0) #check on this at some point
+ 
+
 
 
 ```
 
-# Fixed Effects Framework
+
 ```{r, echo=F}
-
-
+fix1 <- pglm(event~gender_impute+race_impute+age+pubdef+charge_offense+charge_degree+priors+trial_flag+lfo_debt, 
+             data = fin.series,  family = binomial(link = "logit"), index = "person_id")
+summary(fix1)
 ```
