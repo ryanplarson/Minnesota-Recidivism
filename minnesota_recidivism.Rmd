@@ -195,15 +195,18 @@ rm(list = ls()[!ls() %in% c("fin.series")])
 fin.series <- fin.series %>%
   mutate(ordered = ordered*adj, 
          collected = collected*adj)
+
+fin.series$race_impute <- relevel(as.factor(fin.series$race_impute), ref = 6)
          
 ```
 
 # Event History Framework - Time Until Second Case
 
-```{r, include=F, eval=F}
+```{r, include=F}
 #keep only first case per person ID and date of second case if one exists
 #create dataset of just first date of second case
-event <- fin.series %>% filter(count==2) %>% select(person_id, Case_Mkey, date) %>% distinct(Case_Mkey, .keep_all = T) %>% rename(event_date = date, event_case_mkey = Case_Mkey)
+event <- fin.series %>% filter(count==2) %>% select(person_id, Case_Mkey, date) %>%
+  distinct(Case_Mkey, .keep_all = T) %>% rename(event_date = date, event_case_mkey = Case_Mkey)
 
 #reduce series to just first offense
 eha <- fin.series %>% filter(count==1)
@@ -237,7 +240,10 @@ eha <- eha %>%
 #expand series by month, , fill NAs, remove spell if a) before case start, or b) after end_date
 eha <- eha %>% group_by(person_id) %>%
   complete(date = seq.Date(min(date), max(end_date), by = "month")) %>%
-  fill(Case_Mkey, Case_Filed_Date, sentence_date, county, event_case_mkey, event_date, end_date) %>%
+  fill(Case_Mkey, Case_Filed_Date, sentence_date, county, event_case_mkey, event_date, end_date,
+       Party_Mkey, gender_impute, race_impute,
+       name_full, birth_date, sentence_date, pubdef, charge_offense, charge_degree,
+       trial_flag, adj, count) %>%
   filter(date >= sentence_date & date <= end_date) %>%
   mutate(ordered = replace_na(ordered, 0), collected = replace_na(collected, 0),
          event = replace_na(event, 0)) %>% group_by(person_id) %>% 
@@ -252,13 +258,14 @@ eha <- eha %>% group_by(person_id) %>%
   filter(lfo_debt >= 0) %>% #check on this at some point
   mutate(interval_date = date %m+% months(1)-days(1), 
          enter = as.numeric(date)-as.numeric(sentence_date),
-         exit = as.numeric(interval_date)-as.numeric(sentence_date))
+         exit = as.numeric(interval_date)-as.numeric(sentence_date))%>%
+  filter(enter >= 0) #ch3ck this
 
 ```
 
 ## Kaplan-Meier Plots
 
-```{r, echo=F, eval=F}
+```{r, echo=F}
 
 fit <- survfit(Surv(time = enter, time2 = exit, event = event) ~ 1, data = eha)
 
@@ -311,10 +318,11 @@ ggsurvplot_facet(fit2, eha, facet.by = "race_impute",  conf.int = T,
 
 
 ## Cox Proportional hazards Model
-```{r, echo=F, eval=F}
+```{r, echo=F}
 m1 <- coxph(Surv(time = enter, 
                  time2 = exit,
-                 event = event)~age+gender_impute+race_impute+age+pubdef+charge_offense+charge_degree+priors+trial_flag+lfo_debt,
+                 event = event)~age+gender_impute+race_impute+age+
+                 charge_offense+charge_degree+lfo_debt,
             data = eha)
 summary(m1)
 ```
@@ -351,7 +359,8 @@ panel <- fin.series %>%
 
 
 ```{r, echo=F}
-fix1 <- pglm(event~gender_impute+race_impute+age+pubdef+charge_offense+charge_degree+priors+trial_flag+lfo_debt, 
+fix1 <- pglm(event~gender_impute+race_impute+age+pubdef+charge_offense+
+               charge_degree+priors+trial_flag+lfo_debt, 
              data = fin.series,  family = binomial(link = "logit"), index = "person_id")
 summary(fix1)
 ```
