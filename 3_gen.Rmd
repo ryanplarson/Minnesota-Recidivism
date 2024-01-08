@@ -1,0 +1,481 @@
+---
+title: "3-Gen LFO Age/Gender"
+author: "Ryan Larson, PhD Hamline University"
+date: "2023-02-07"
+output: html_document
+---
+
+```{r, message=F}
+#packages
+library(dplyr)
+library(readr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+```
+
+# Person/Case Data
+
+```{r, include=F}
+
+#processing party file
+party <- read_delim("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Original Data/Party.txt", 
+                    delim = "|", 
+                    na = "NULL", 
+                    trim_ws = T,
+                    escape_double = F) %>% 
+  slice(-dim(.)[1]) %>%
+  select(-Party_State_ID_Number, -Party_FBI_Number, -Party_Name_Current_Flag,
+         -Party_Name_Inactive_Flag, -Party_Name_Entered_Date) 
+
+#character vector of businesses-for filtering (based on Rob's code)
+business <-  c(" CAR "," CARS "," SCHL ", " CO ", " INC "," ELEC ", " SERV ", " PAINT "," CONST "," SYS "," TIRE ", " SALES "," CHEV ", " LLC "," CORP "," OFFICE ","COMPANY","TWIN CITY"," AUTO ","CAR2GO"," CITY ", 	"SERVICE"," TAXI ","ASSOCIATES","ENTERPRISES","REALTY","PROGRAM","CONTRACTING",
+ "MECHANICAL"," LLP "," LTD ","SVCS","QUIZNOS","MTRS", " DEPT ","CONSULTING","TRUCKING","TRANSPORT", "SOFTWARE","HYUNDAI","HEALTHCARE","REMODELING","STAR TRIBUNE"," FLEET ","DIVERSIFIED","TEEN CHALLENGE",
+"FED EX","HONDA LEASE","RENT A CAR"," CTR ","MINISTRIES"," GROUP ","STUDIO","CARPETS","PAINTING", "COMMUNICATION","INVESTMENT"," SPORTS ","MEDICAL","BUILDERS","LANDSCAP","LAWNCARE","LIMOUSINE","ELECTRIC","CONTRACT","HEATING","PLBG","PLUMBING"," HTG ","APPLIANCE","FLORIST","LAWN CARE","DRIVING",
+" AAA ","SANITATION","CHECKER CAB","WCCO","PHOTOG","CREDIT UNION","ROOFING","ADVANCED","EXECUTIVE",
+" TRUST ","REVOCABLE","LOGGING","ERROR","HEATING","HENNEPIN","MINNESOTA","MINNEAPOLIS",
+"DEPARTMENT","MTRS","EXPR","TECHNOLOGIES","RESTAURANT","BODYWORK"," LSG ","TELECONCEPTS","AUTOMOTIVE", "MARKETING","MASONRY","EXCAVATING","DRYWALL","TRKING","MAINTANACE"," LIMOS ","BLACKTOPPING", "MOTORS","FDS","TELEVISION","FINANCIAL","GRAPHICS","UNLIMITED","BLDRS","VENDING","REBUILDING","TELECOM", " EQUIP ","DELIVERY","RNTL","MANGMENT","CONSTRUCTION","BUILDINGS","DISTRIBUTION",
+"DEVELOPMENT","PROBATION"," TOOL ","INVESTMENT","PARTNERSHIP","CLEANERS","COMPANIES"," ASSOC ","BLACKTOP", "LIVESTOCK","AMOCO","INSTALLATION","LEASING","RACING"," TRADING "," ENTR ","PRINTING","DYNAMICS", "DISTRIBUTING","REBUILDING","FARMS","COPPERMANASSOCIATES","EXTERIORS","SERVS","REMOVAL","OUTDOORS",
+"US FUNDING","TOWING","MACHINERY","A A A","INVESTMENST","M I BANK","C P INTERNET","U S DIAMOND", "INDUSTRIES","S C R A M","PROPERTIES","HOLDINGS","VOLUNTEERS","INFORMATION","WIRELESS","FASHION", "INSTERSTATE","ELECTRICAL","A B WELDING MFG"," CARPET ","ABOVE THE LINE LEADERS INT","CONCRETE", "FLOORING","ADVISORS RESOURCE","CATERING"," DESIGN ","DENNY HECKER","BUILDING","FINANCIN",
+"AMERICAN CREDIT ACCEPTANCE","ANDERSON CC","ASHA HOME HEALTH CARE","AT HOME APARTMENTS",
+"AURORA STRATEGIC ADVISORS","BACK ON TRACK","BAD AXE LAKE ASSN","BERNATELLOS PIZZA",
+"BERNETT HOME IMPROVEMENT","BIYNAH INDUSTRIAL PARTNERS L","BLOOMINGTON ACURA","BONANZA GRAIN",
+"LIMITIED","SYNAGOGUE","EQUIP","BRAD OLSON CONCRETE","BRIAN J KAREN L BEBEL TRUS",
+"BRIDE TO BE CONSIGNMENT","BRIGHTON SANDBLASTING","BURLINGTON NORTHERN SANTA FE RAILROAD",
+"BURLINGTON NORTHERN SANTE FE","CAPITAL ONE BANK USA NA","CAPUAL VENTURES","CENEX HARVEST STATES",  "CUSTOM","FOODS","MASONRY","ENTERPRISE","CHENSTONE CG","EMERGENCY","INTERNATIONAL","ARCHITECTURE", "CHRISITIANN M MALLINGER REVO","MGMT","PROPERTY","INTERTAINMENT","CHRISTOPHER QUINN VIOLINS IN",
+"CIRRUS FLIGHT OPERATIONS","COMMERCIAL ASPHALT REPAIR","COMPLETE GROUNDS MAINTENANCE",
+"CONCORD MEAT PROCESSING","CORRECTIVE EXERCISE SPC","CRYSTAL BAY CAPITAL CONSULTI","CS RENTALS", "EQUIPMENT","BUSINESS","ACADEMY","SPECIALTIES","DANCIN OFF BROADWAY",
+"DAVID SUSAN PETERSON REV L","DECAIGNY EXCVATING","LABORATORIES","DECORATING","DECORAH BUILDING SUPPLY",
+"DISTINGUISHED LAWN LANDSCA","DIV INTERNATIONAL","DIVINE BLINDS","DRS NORTH WATSON OPTOM PA", "PRODUCTIONS","SYSTEM","EAGLE SQUARE","EAST AFRICAN BAKERY","ACCESS MEDIA",
+"ELZABETH HILDEGARD FOLEY REV"," TRAVEL ","ERICKSON WOOD CHIPS","ETHIX REINSURANCE INTRMEDIAR",
+"EVANS GRAIN FARM","INTELLIGENT","AGENCY","SOLUTIONS","FARMERS STATE BANK","FLAHERTYS HITECH TRAILERS", "FOUR SEASON MAINTENANCE","FRANKLIN BUSINESS ADVISORS I","FREDDIES MINI STORAGE",
+"FUTURE STARS CHILD CARE","GOULD CHEVROLET","CORPORATION","GUARDIAN PEST SOLUTIONS","HA TEIN GROCERY", "HARRINGTON ORTHODONTICS","HAUSER HOMES","HEDLUND ENG","HIGH PROFILE GROUND MAINT",
+"HIGH PROFILE GROUNDS MAINT I","HOLMEN PROMOTIONS","HOMETOWN FURNITURE","ICE ISTALLING COOLERS ECT IN", "INVISION DISTINCTIVE EYEWARE","JAMES D FOLEY MD PA","JANESVILLE CAR WASH",
+"JANICE BERG IRREV SPEC NEEDS","JLA INDUSTRIAL EQUIPMENT","JOHN HANSON WOOD PRODUCTS",
+"JOHNSON JEWELERS","JOHNSON MVG","JOHNSON TIMBER HARVESTING IN","KAB SEAL COATING","KALS RENTAL",
+"KELLY CONCRETE","KISSERY","LAW FIRM","KRIEGLER REHABILITATION","LAKE REGION PETROLEUM",
+"LAKEVILLE MOTOR EXPRESS","LAKO DRILLING","LEES PIZZA","LMV NYP SECURITY PATROL",
+"LONG CHENG MEAT PROCESSING","LOVE IN ACTION ADMISTERY","LUCKEN TRUCK PARTS","LUKEN ARCHITECTURE PA", "MAANDEEQ HOME HEALTH CARE LL","MAC MACINC","MAINSTREAM GUTTERS","MALINSKI PROP","MARVEL BOOKKEEPING", "MAU FARM MANAGEMENT","MAX R ELKIN IRREVOCABLE TRUS","MEGASHIP VENTURES","MICK JOHNSON DISPOSAL","MIDWEST HOLIDAY LAWN","MIDWEST QUALITY HOME CARE IN","MIDWEST WHOLESALE","MOLITER BROTHERS FARM","MORKEN EXPRESS", "MORRIS MICHELE M DOLLAR TREE","MORRISON COUNTY PUBLIC WORKS","MUSE MGMT ENTERTAINMENT","NATURAL HOMES BY JOHN PASTUC","NETWORK ACCESS PRODS","NEWGATE ED RESEARCH CENTER","NISSAN INFINITI LT","NISSANINFINITI LT","NORTH COUNTY PAVING","NORTH MEMORIAL AMBULANCE",
+"NORTH PRO REPRESENTATIVES IN","NORTHERN ENGINE SUPPLY","NORTHSTAR READY MIX","OLSON HAULING",
+"PAPAS CAFE","PAX CONNEX","PERFORMANCE FOAM INSULATION","PETERSON PROFESSIONAL PAPER","PRO POLISH", "PROFESSIONAL TOUCH PTG REN","PROSPERO INST FOR INVESTORS","QUALITY COACHES","RAMSEY CTY HNDA GL",
+"RED WING CHRYSLER","REDLINE ARCHIT SHEET METAL L","REMUND FAMILY REV LIVING TRU","RF MOELLER",
+"RICHARD ALMA SCHNEIDER REV","ROBERT CARY SPARROW REV TRUS","LAW OFFICE","S R CUSTOM LAMINATE WOOD", "SAGINAW PAVING HOME IMPROVEMENT PAY ND","SAGINAW PAVING PAY ST","SCHAEFER HARDWOOD FLOORS",
+"SCHNEIDER CARPET ONE","SEASONS BLESSINGS SUDERS","SEMPSTONE PRODUCTS","SHARMA BROS KIRTI KANT", "SIMPLEXGRINNELL LP","SIVERTSON GALLERY","SOUTH TOWN REFRIGERATION",
+"SOUTHERN WEST FUNERAL HOMES","SUPERIOR FORD","TACO JOHNS","TARGET NATIONAL BANK","TAYO HOME HEALTH",
+"THE CAROL L HEASLEY LIVING T","FAMILY","REAL EASTATE"," PLACE ","ARCHITECT","APPLE VALLEY","APOSTOLIC",
+"ARAMARK","MPLS","TOWLE PROP","TWIN PINES WINDOW CLEANING","UNIVERSITY","COMCAST",
+"CHRIST CHURCH","H O M E S","MIDWEST","MGMT","INSTALLATION","VEIN CLINIC PA","ASSOCIATION",
+" REV T","CONVENIENCE","XTREME CLEAN","Z VISION TOURS","SWAT RESPONSE","COMMISSIONER OF PUBLIC SAFETY",
+"ON TIME TRAN","GARAGE FLOOR COATING OF MINN","PARAGON PROP OF MAPLE GROVE",
+"LIMITIED","AUTOWORLD","AUTOS","AIRPORT","VOLVO","SISTERS OF","THE ESTATE OF CHRISTOPHER ZIMMER", "FUNERAL","CLEANING","WASTE MANAGEMENT OF WI","WD WINTER AND ASSC","EMPLOYEE BENIFIT AND INS SER", "SHEGSTAD AND SONS","BUSHES AND BEYOND","PUBLIC", " SCHOOL "," DIST ","MORTGAGE","FLOOR SANDING", " LOCAL "," IBEW ","DECEASED","DAYCARE","BEST BUY","WHITE BEAR","REPAIR","CNTY","IMPORT",
+"EXPORT","APARTMENT","CLEANING","CORPORATION", "COBALT", "MINNCO")
+
+other.remove <- c("PRIVATE","MNCIS","DEFECTIVE","UNKNOWN", "DELETE", "ERROR")
+
+address.replace <- c("NO CURRENT ADDRESS DO NOT SEND NOTICE","NO CURRENT ADDRESS NO MAILED NOTICE",
+"NO PERMANENT ADDRESS","DECEASED","NO PRESENT ADDRESS","CONFIDENTIAL","UNKNOWN","ADDRESS",
+"UNDELIVERABLE","HOMELESS","WHERE THAT MAY BE","SAFE PLACE","SUBJECTS RESIDENCE","UNITED STATES",
+"NO MAILED NOTICES","GENERAL DELIVERY","XXX","XX","ZZ","ZZZ","NPA","NKA","UNK","N P A","ADDRESS UNKNOWN", "NO CURRENT NO MAILED","NO GOOD 4611","NO PERM")
+
+#string to detect OID number
+oid <- c("OID", "OID#", "#OID", "OID ", " OID", " OID ")
+
+#strings that OID code picks up but reverted to no prison
+oid.fix <- c("WOIDA", "NOID", "GOIDENROD", "RESERVOID", "GOIDER", "OID CEDAR AVE","FLOIDA")
+
+name.process <- function(x){
+  upper <- str_to_upper(x) #transform to uppercase
+  despace <- str_replace_all(upper,"  "," ") #remove double spaces
+  trim <- str_trim(despace, side = "both") #trim whitespace
+  clean <- str_remove_all(trim, pattern = "[^[:alpha:][:space:]'-]") #remove some special characters
+}
+
+address.process <- function(x){
+  upper <- str_to_upper(x) #transform to uppercase
+  despace <- str_replace_all(upper,"  "," ") #remove double spaces
+  trim <- str_trim(despace, side = "both") #trim whitespace
+  clean <- str_remove_all(trim, pattern = "[^[:alnum:][:space:]'#]") #remove some special characters
+  replace <- str_replace_all(clean, pattern = paste(address.replace, collapse = "|"),
+                             replacement = "")
+}
+
+city.process <- function(x){
+  upper <- str_to_upper(x) #transform to uppercase
+  despace <- str_replace_all(upper,"  "," ") #remove double spaces
+  trim <- str_trim(despace, side = "both") #trim whitespace
+  clean <- str_remove_all(trim, pattern = "[^[:alpha:][:space:]]") #remove some special characters
+}
+
+
+zip.process <- function(x){
+  despace <- str_replace_all(x,"  "," ") #remove double spaces
+  trim <- str_trim(despace, side = "both") #trim whitespace
+  clean <- str_remove_all(trim, pattern = "[^[:digit:]-]") #remove some special characters
+}
+
+
+#clean party file
+party.clean <- party %>% 
+  filter(!(row_number() %in% problems(party)$row)) %>% #1216 cases
+  mutate(birth_date = as.Date(Party_Current_Birth_Date)) %>%
+  filter(is.na(Party_Current_Birth_Date) | Party_Current_Birth_Date > "1900-01-01") %>% #177 cases
+  select(-Party_Current_Birth_Date) %>%
+  mutate(name_full = name.process(Party_Name_Full),
+         name_first =  name.process(Party_Name_First),
+         name_middle =  name.process(Party_Name_Middle),
+         name_last =  name.process(Party_Name_Last),
+         name_suffix = name.process(Party_Name_Suffix)) %>%
+  mutate(name_full_order = paste(name_first, name_middle, name_last,name_suffix)) %>%
+  mutate(name_full_order = str_remove_all(name_full_order, pattern = c("NA | NA | NA"))) %>%
+  select(-starts_with("Party_Name")) %>%
+  #filter(!str_detect(name_full, paste(business, collapse = "|"))) %>%
+  #filter_at(vars(starts_with("name_")), 
+            #any_vars(!str_detect(., pattern = paste(other.remove, collapse = "|")))) %>%
+  mutate(business_flag = case_when(
+    str_detect(name_full, paste(business, collapse = "|")) ~ "Yes",
+    TRUE ~ "No"),
+    other_remove_flag = case_when(
+    str_detect(name_full, paste(other.remove, collapse = "|")) ~ "Yes",
+    str_detect(name_first, paste(other.remove, collapse = "|")) ~ "Yes",
+    str_detect(name_middle, paste(other.remove, collapse = "|")) ~ "Yes",
+    str_detect(name_last, paste(other.remove, collapse = "|")) ~ "Yes",
+    TRUE ~ "No")) %>%
+  mutate(zip_code = zip.process(Party_Address_Zip_Code),
+         address_line1 = address.process(Party_Address_Line1),
+         address_line2 = address.process(Party_Address_Line2),
+         address_line3 = address.process(Party_Address_Line3),
+         address_line4 = address.process(Party_Address_Line4),
+         address_city = city.process(Party_Address_City)) %>%
+  rename(address_state = Party_Address_State_Code) %>%
+  select(-starts_with("Party_Address")) %>%
+  rename(race = Self_Rpt_Race, gender = Party_Gender_Code) %>%
+  mutate(oid_tag = case_when( 
+            str_detect(address_line1, pattern = paste(oid, collapse = "|")) ~ "YES",
+            str_detect(address_line2, pattern = paste(oid, collapse = "|")) ~ "YES",
+            str_detect(address_line3, pattern = paste(oid, collapse = "|")) ~ "YES",
+            str_detect(address_line4, pattern = paste(oid, collapse = "|")) ~ "YES",
+            TRUE~"NO")) %>%
+  mutate(oid_tag = ifelse(
+   str_detect(address_line1, pattern = paste(oid.fix, collapse = "|")),"NO",oid_tag)) %>% 
+  mutate(mnprison = case_when(
+   str_detect(address_line1, c("STILL|970|PICKETT")) & oid_tag=="YES"~ "STILLWATER",
+   str_detect(address_line2, c("STILL|970|PICKETT")) & oid_tag=="YES"~ "STILLWATER",
+   str_detect(address_line3, c("STILL|970|PICKETT")) & oid_tag=="YES"~ "STILLWATER",
+   str_detect(address_line4, c("STILL|970|PICKETT")) & oid_tag=="YES"~ "STILLWATER",
+   str_detect(address_line1, c("RUSH|7600")) & oid_tag=="YES"~ "RUSH CITY",
+   str_detect(address_line2, c("RUSH|7600")) & oid_tag=="YES"~ "RUSH CITY",
+   str_detect(address_line3, c("RUSH|7600")) & oid_tag=="YES"~ "RUSH CITY",
+   str_detect(address_line4, c("RUSH|7600")) & oid_tag=="YES"~ "RUSH CITY",
+   str_detect(address_line1, c("FARI|FAIR|LINDEN|1101")) & oid_tag=="YES"~ "FARIBAULT",
+   str_detect(address_line2, c("FARI|FAIR|LINDEN|1101")) & oid_tag=="YES"~ "FARIBAULT",
+   str_detect(address_line3, c("FARI|FAIR|LINDEN|1101")) & oid_tag=="YES"~ "FARIBAULT",
+   str_detect(address_line4, c("FARI|FAIR|LINDEN|1101")) & oid_tag=="YES"~ "FARIBAULT",
+   str_detect(address_line1, c("SHAK|1010")) & oid_tag=="YES"~ "SHAKOPEE",
+   str_detect(address_line2, c("SHAK|1010")) & oid_tag=="YES"~ "SHAKOPEE",
+   str_detect(address_line3, c("SHAK|1010")) & oid_tag=="YES"~ "SHAKOPEE",
+   str_detect(address_line4, c("SHAK|1010")) & oid_tag=="YES"~ "SHAKOPEE",
+   str_detect(address_line1, c("OAK|OSGOOD|5329")) & oid_tag=="YES"~ "OAK PARK HEIGHTS",
+   str_detect(address_line2, c("OAK|OSGOOD|5329")) & oid_tag=="YES"~ "OAK PARK HEIGHTS",
+   str_detect(address_line3, c("OAK|OSGOOD|5329")) & oid_tag=="YES"~ "OAK PARK HEIGHTS",
+   str_detect(address_line4, c("OAK|OSGOOD|5329")) & oid_tag=="YES"~ "OAK PARK HEIGHTS",
+   str_detect(address_line1, c("ST CLOUD|CLOUD|2305|MINNESOTA B")) & oid_tag=="YES"~ "ST CLOUD",
+   str_detect(address_line2, c("ST CLOUD|CLOUD|2305|MINNESOTA B")) & oid_tag=="YES"~ "ST CLOUD",
+   str_detect(address_line3, c("ST CLOUD|CLOUD|2305|MINNESOTA B")) & oid_tag=="YES"~ "ST CLOUD",
+   str_detect(address_line4, c("ST CLOUD|CLOUD|2305|MINNESOTA B")) & oid_tag=="YES"~ "ST CLOUD",
+   str_detect(address_line1, c("MOOSE|SHORE")) & oid_tag=="YES"~ "MOOSE LAKE",
+   str_detect(address_line2, c("MOOSE|SHORE")) & oid_tag=="YES"~ "MOOSE LAKE",
+   str_detect(address_line3, c("MOOSE|SHORE")) & oid_tag=="YES"~ "MOOSE LAKE",
+   str_detect(address_line4, c("MOOSE|SHORE")) & oid_tag=="YES"~ "MOOSE LAKE",
+   str_detect(address_line1, c("TOGO|6271")) & oid_tag=="YES"~ "TOGO",
+   str_detect(address_line2, c("TOGO|6271")) & oid_tag=="YES"~ "TOGO",
+   str_detect(address_line3, c("TOGO|6271")) & oid_tag=="YES"~ "TOGO",
+   str_detect(address_line4, c("TOGO|6271")) & oid_tag=="YES"~ "TOGO",
+   str_detect(address_line1, c("LINO|7525")) & oid_tag=="YES"~ "LINO LAKES",
+   str_detect(address_line2, c("LINO|7525")) & oid_tag=="YES"~ "LINO LAKES",
+   str_detect(address_line3, c("LINO|7525")) & oid_tag=="YES"~ "LINO LAKES",
+   str_detect(address_line4, c("LINO|7525")) & oid_tag=="YES"~ "LINO LAKES",
+   str_detect(address_line1, c("WILLOW|86032")) & oid_tag=="YES"~ "WILLOW",
+   str_detect(address_line2, c("WILLOW|86032")) & oid_tag=="YES"~ "WILLOW",
+   str_detect(address_line3, c("WILLOW|86032")) & oid_tag=="YES"~ "WILLOW",
+   str_detect(address_line4, c("WILLOW|86032")) & oid_tag=="YES"~ "WILLOW",
+   str_detect(address_line1, c("RED|WING|1079")) & oid_tag=="YES"~ "RED WING",
+   str_detect(address_line2, c("RED|WING|1079")) & oid_tag=="YES"~ "RED WING",
+   str_detect(address_line3, c("RED|WING|1079")) & oid_tag=="YES"~ "RED WING",
+   str_detect(address_line4, c("RED|WING|1079")) & oid_tag=="YES"~ "RED WING",
+   str_detect(address_line1, c("MCF|MCF-|MN CORR|MINNESOTA CORR")) & oid_tag=="YES"~ "OTHER",
+   str_detect(address_line2, c("MCF|MCF-|MN CORR|MINNESOTA CORR")) & oid_tag=="YES"~ "OTHER",
+   str_detect(address_line3, c("MCF|MCF-|MN CORR|MINNESOTA CORR")) & oid_tag=="YES"~ "OTHER",
+   str_detect(address_line4, c("MCF|MCF-|MN CORR|MINNESOTA CORR")) & oid_tag=="YES"~ "OTHER",
+   oid_tag=="YES" & address_state=="MN" & 
+    !str_detect(address_line1, pattern = "MCF|MCF-|MN CORR|MINNESOTA CORR|STILL|970|PICKETT|RUSH|7600|FARI|FAIR|LINDEN|1101|SHAK|1101|OAK|OSGOOD|5329|CLOUD|2305|MINNESOTA B|MOOSE|SHORE|TOGO|6271|LINO|7525|WILLOW|86032|RED|WING|1079") ~ "OTHER",
+   oid_tag=="YES" & address_state=="MN" & 
+    !str_detect(address_line2, pattern = "MCF|MCF-|MN CORR|MINNESOTA CORR|STILL|970|PICKETT|RUSH|7600|FARI|FAIR|LINDEN|1101|SHAK|1101|OAK|OSGOOD|5329|CLOUD|2305|MINNESOTA B|MOOSE|SHORE|TOGO|6271|LINO|7525|WILLOW|86032|RED|WING|1079") ~ "OTHER", 
+  oid_tag=="YES" & address_state=="MN" & 
+    !str_detect(address_line3, pattern = "MCF|MCF-|MN CORR|MINNESOTA CORR|STILL|970|PICKETT|RUSH|7600|FARI|FAIR|LINDEN|1101|SHAK|1101|OAK|OSGOOD|5329|CLOUD|2305|MINNESOTA B|MOOSE|SHORE|TOGO|6271|LINO|7525|WILLOW|86032|RED|WING|1079") ~ "OTHER", 
+  oid_tag=="YES" & address_state=="MN" & 
+    !str_detect(address_line4, pattern = "MCF|MCF-|MN CORR|MINNESOTA CORR|STILL|970|PICKETT|RUSH|7600|FARI|FAIR|LINDEN|1101|SHAK|1101|OAK|OSGOOD|5329|CLOUD|2305|MINNESOTA B|MOOSE|SHORE|TOGO|6271|LINO|7525|WILLOW|86032|RED|WING|1079") ~ "OTHER")) 
+
+
+monsanc <- read_csv("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/monsanc.csv")
+
+party.key <- monsanc %>%
+  select(party_mkey, person_id) %>%
+  distinct(person_id, .keep_all = T)
+
+party.clean <- party.clean %>% 
+  left_join(party.key, by = c("Party_Mkey"="party_mkey"))
+
+#keep all unique case_mkeys, match to case_level
+party.clean <- party.clean %>% distinct(Case_Mkey, .keep_all = T)
+  #effectively drops second individual on multi individual case (number above)
+
+#race/gender imputation
+
+#custom mode function that randomly selects a mode in cases with multiple modes
+get_mode <- function(x, na.rm = FALSE) {
+  if(na.rm==TRUE){
+    x <- x[!is.na(x)]
+  }
+  ux <- unique(x)
+  tab <- tabulate(match(x, ux))
+  mode <- ux[tab == max(tab)]
+  if(length(mode > 1)){
+    mode <- sample(mode, 1)
+  }
+  return(mode)
+}
+
+party.clean <- party.clean %>% 
+  mutate(race.miss = case_when(race=="White"~"white",race=="Asian"~"asian",
+    race=="Black"~"black",race=="HawaiianPacific"~"other",race=="Hispanic"~"hispanic",
+    race=="Indian"~"nat. am.",race=="Multiracial"~"other",race=="Other"~"other",
+    race=="Refused"~NA_character_,race=="Unavailable"~NA_character_,race=="Unknown"~NA_character_)) %>%
+  group_by(person_id) %>%
+  mutate(race_impute = replace(race.miss, is.na(race.miss), get_mode(race.miss, na.rm = T))) %>%
+  select(-race.miss) %>%
+  arrange(person_id, Case_Mkey) %>%
+  group_by(person_id) %>%
+  mutate(gender_impute = replace(gender, is.na(gender), get_mode(gender, na.rm = T))) 
+
+#processed party file
+party <- party.clean %>% 
+  select(person_id, Party_Mkey, Case_Mkey, gender_impute, race_impute, name_full, birth_date) %>%
+  arrange(person_id, Case_Mkey) 
+                   
+case <- read_delim("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Original Data/Case.txt", delim = "|", na = "NULL",
+                   col_types = list(col_character(), col_double(), 
+                                 col_datetime(), col_datetime(), 
+                                 col_character(), col_datetime(), 
+                                 col_character(), col_character(),
+                                 col_character(), col_character(),
+                                 col_character(), col_character(),
+                                 col_character())) %>% 
+  slice(-dim(.)[1]) %>%
+  select(Case_Mkey, Case_Filed_Date, Filed_County)
+
+#merge in sentence_date via case_mkey,
+  #mncis already has, vibes does not, keeping this for reference
+sentence <- read_delim("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Original Data/Sentence.txt", delim = "|", na = "NULL", trim_ws = T) %>%
+    slice(-dim(.)[1]) %>% select(Case_Mkey, Sentence_Date) %>% distinct(Case_Mkey, .keep_all = T) %>%
+    mutate(Sentence_Date = as.character(format(Sentence_Date, "%Y-%m-%d" )))
+
+#person-case data with sentence date merged
+person.case <- party %>% 
+  mutate(Case_Mkey = as.numeric(Case_Mkey)) %>%
+  left_join(case, by = "Case_Mkey") %>% 
+  left_join(sentence, by = "Case_Mkey")
+
+#write_csv(person.case, "C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/person_case.csv")
+
+person.case <- read_csv("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/person_case.csv")
+```
+
+# Financial Data
+
+```{r, include=F}
+#MNCIS Financial - originally at transaction level
+mncis <- read_delim("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Original Data/MNCIS_Financial.txt", 
+                    delim = "|", 
+                    na = "NULL",
+                     col_types = list(col_double(), col_double(), 
+                                 col_double(), col_character(), 
+                                 col_character(), col_double(), 
+                                 col_datetime(), col_character(),
+                                 col_character(), col_double(),
+                                 col_double(), col_double(),
+                                 col_double(), col_double(),
+                                 col_double(), col_double())) %>%
+  slice(-dim(.)[1])
+
+#Merging reduced category variable
+mncis.bridge <- read_csv(file = "C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/mncis_fees.csv")
+mncis$Fee_Type_Category_Desc <- str_trim(mncis$Fee_Type_Category_Desc, side = "both") #trimming wtspace
+mncis$Fee_Type_Desc <- str_trim(mncis$Fee_Type_Desc, side = "both") #trimming wtspace
+
+mncis <- mncis %>% left_join(mncis.bridge, 
+      by = c("Fee_Type_Desc"="fee_type_desc", "Fee_Type_Category_Desc"="fee_type_category_desc"))
+
+#mncis time series
+  #mncis financial transaction date for ordered IS the sentence date
+mncis.time <- mncis %>%
+  select(Case_Mkey, new_cat, 
+         Financial_Transaction_Detail_Charge_Amount, 
+         Financial_Transaction_Detail_Payment_Amount,
+         Financial_Transaction_Detail_Credit_Amount,
+         Financial_Transaction_Date) %>%
+  rename(mncis_ordered = Financial_Transaction_Detail_Charge_Amount,
+         mncis_collected = Financial_Transaction_Detail_Payment_Amount,
+         mncis_credit = Financial_Transaction_Detail_Credit_Amount,
+         type = new_cat,
+         date = Financial_Transaction_Date) %>%
+  mutate(mncis_ordered_adj = mncis_ordered-mncis_credit) %>%
+  mutate(mncis_ordered_adj = ifelse(mncis_ordered_adj < 0, 0, mncis_ordered_adj),
+         mncis_collected = ifelse(mncis_collected < 0, 0, mncis_collected),
+        date = format(date, "%Y-%m")) %>%
+  filter(type!="BAIL", type!="UNK") %>%
+  select(-type, -mncis_ordered) %>%
+  group_by(Case_Mkey, date) %>%
+  summarise(mncis_ordered = sum(mncis_ordered_adj, na.rm = T),
+            mncis_collected = sum(mncis_collected, na.rm=T)) %>%
+  arrange(Case_Mkey, date)
+
+rm(mncis, mncis.bridge)
+
+#write_csv(mncis.time, "C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/mncis.time.csv")
+mncis.time <- read_csv("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/mncis.time.csv")
+
+#vibes - made to match mncis.time
+#VIBES financial 
+vibes <- read_delim("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Original Data/VIBES_Financial.txt", delim = "|", na = "NULL") %>% 
+  slice(-dim(.)[1]) 
+
+#vibes time series
+  #vibes does not have sentence date, must merge in from sentence
+vibes.clean <- vibes %>% 
+  select(Incident_ID, 
+         Total_Assessments, 
+         Total_Payments,
+         Payment_Date) %>%
+  mutate(vibes_ordered = ifelse(Total_Assessments < 0, 0, Total_Assessments),
+         vibes_collected = ifelse(Total_Assessments < 0, 0, Total_Assessments),
+         payment_date = format(Payment_Date, "%Y-%m")) %>%
+  select(-Payment_Date, -Total_Assessments, -Total_Payments) %>%
+  mutate(vibes_ordered = ifelse(is.na(vibes_ordered), 0, vibes_ordered),
+         vibes_collected = ifelse(is.na(vibes_collected), 0, vibes_collected))
+
+#merge vibes bridge to vibes, then select unique identifiers merge
+vibes.bridge <- read_delim("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Original Data/VIBES_Bridge.txt", delim = "|", na = "NULL") %>%
+  slice(-dim(.)[1]) 
+
+vibes.merge <- vibes %>% 
+  mutate(Incident_ID = as.numeric(Incident_ID)) %>%
+  left_join(vibes.bridge, by = c("Incident_ID" = "INCIDENT_ID")) %>%
+  mutate(county = ifelse(CNTY_CODE==62, "Ramsey County", "Hennepin County")) %>%
+  select(Case_Mkey, county, Incident_ID) %>% distinct(Incident_ID, .keep_all = T)
+
+vibes.clean <- vibes.clean %>%
+  mutate(Incident_ID = as.numeric(Incident_ID)) %>%
+  left_join(vibes.merge, by = "Incident_ID")
+
+#merge in sentence date from person.case object (have to merge by Case_Mkey and county)
+vibes.clean <- vibes.clean %>% 
+  mutate(Case_Mkey = as.numeric(Case_Mkey)) %>%
+  left_join(person.case, by = c("county"="Filed_County", "Case_Mkey")) %>%
+  select(Incident_ID, Case_Mkey, vibes_ordered, vibes_collected, Sentence_Date, payment_date)
+
+  
+vibes.ordered <- vibes.clean %>% 
+  select(Incident_ID, vibes_ordered, Sentence_Date) %>%
+  rename(date = Sentence_Date)
+vibes.payed <- vibes.clean %>% select(Incident_ID, vibes_collected, payment_date) %>%
+  rename(date = payment_date)
+  
+vibes.time <- vibes.ordered %>% bind_rows(vibes.payed) %>%
+    group_by(Incident_ID, date) %>%
+    summarize(vibes_ordered = sum(vibes_ordered, na.rm=T),
+              vibes_collected = sum(vibes_collected, na.rm=T)) %>%
+    arrange(Incident_ID, date) %>%
+    filter(!is.na(date)) #need to take a look at this
+
+vibes.time <- vibes.time %>% left_join(vibes.merge, by = "Incident_ID")
+
+#write_csv(vibes.time, "C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/vibes.time.csv")
+vibes.time <- read_csv("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/vibes.time.csv")
+
+#merging person.case to mncis and vibes series (have to do merges separately before appending due to id's)
+mncis.person <- mncis.time %>% left_join(person.case, by = "Case_Mkey") %>% 
+  rename(ordered = mncis_ordered, collected = mncis_collected, county = Filed_County) 
+vibes.person <- vibes.time %>% 
+  mutate(Case_Mkey = as.numeric(Case_Mkey)) %>%
+  left_join(person.case, by = c("county"="Filed_County", "Case_Mkey")) %>%
+  rename(ordered = vibes_ordered, collected = vibes_collected) %>% ungroup() %>% select(-Incident_ID)
+
+#combining
+fin.series <- mncis.person %>% 
+  bind_rows(vibes.person) %>% 
+  arrange(person_id, date, Case_Mkey)
+
+#write_csv(fin.series, "C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/fin.series.csv")
+fin.series <- read_csv("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/fin.series.csv")
+
+monsanc <- read_csv("C:/Users/rlarson21/Documents/Research/Monetary Sanctions/MonSanc/Misc Data/monsanc.csv")
+
+adj <- monsanc %>%
+  filter(sentence_year >= 2004 & sentence_year <= 2018) %>%
+  group_by(sentence_year) %>%
+  summarize(adj = mean(adj, na.rm = T))
+
+rm(list = ls()[!ls() %in% c("fin.series", "adj")])
+
+#3-gen stratification
+
+three_gen_strat <- fin.series %>%
+  mutate(Sentence_Date = as.Date(Sentence_Date),
+         age = as.numeric(round(Sentence_Date-birth_date, 0))/365,
+         sentence_year = lubridate::year(Sentence_Date),
+         filed_year = lubridate::year(Case_Filed_Date),
+         date = as.Date(paste(date, "-01", sep = ""))) %>%
+  filter(date <= Sentence_Date+days(90) &
+           filed_year >= 2010 & filed_year <= 2015) %>% #90 day window!
+  left_join(adj, by = "sentence_year") %>%
+  mutate(ordered = ordered*adj, 
+         collected = collected*adj,
+         age = ifelse(age <= 15, NA_integer_, age),
+         age_cat = case_when(
+            age >= 16 & age <= 35~"16-35",
+            age >= 36 & age <= 55~"36-55",
+            age >= 56~"56+")) %>%
+  group_by(Case_Mkey, gender_impute, race_impute,age_cat) %>%
+  summarize(ordered = sum(ordered, na.rm = T),
+            collected = sum(collected, na.rm = T)) %>%
+  mutate(unpaid = ifelse(collected < ordered, 1, 0)) %>%
+  group_by(gender_impute, age_cat, race_impute) %>%
+  summarize(unpaid = mean(unpaid, na.rm = T)*100) %>%
+  filter(!is.na(gender_impute) & !is.na(age_cat) & !is.na(race_impute)) %>%
+  mutate(gender_impute = ifelse(gender_impute=="M", "Male", "Female"),
+         race_impute = factor(case_when(
+           race_impute=="asian"~"Asian",
+           race_impute=="black"~"Black",
+           race_impute=="hispanic"~"Hispanic",
+           race_impute=="nat. am."~"Nat. Am.",
+           race_impute=="other"~"Other",
+           race_impute=="white"~"White"
+         ), levels = c("White", "Black", "Hispanic", 
+                       "Nat. Am.", "Asian", "Other")))
+
+
+ggplot(three_gen_strat, aes(x = age_cat, y = unpaid))+
+  geom_bar(aes(fill = gender_impute), position = "dodge", stat = "identity")+
+  facet_grid(~race_impute)+
+  geom_text(aes(label=round(unpaid,0), group = gender_impute), 
+            position=position_dodge(width = .9), vjust=-0.25, size = 2.5)+
+  scale_fill_manual(values = c("#273B5B","#C1C243"))+
+  labs(y = "Percent Unpaid (within 90 days)",
+       x = "Age",
+       fill = "Gender",
+       caption = "Source: author's tabulations of Cases Filed 2010-2015 (MN SCAO)")+
+  theme_minimal()+
+    theme(axis.text.x=element_text(angle=45, hjust=1)) 
+  
+```
